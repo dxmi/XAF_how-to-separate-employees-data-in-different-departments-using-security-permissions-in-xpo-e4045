@@ -48,8 +48,9 @@ namespace MainDemo.Web {
             // securityStrategyComplex1
             // 
             this.securityStrategyComplex1.Authentication = this.authenticationStandard1;
-            this.securityStrategyComplex1.RoleType = typeof(DevExpress.ExpressApp.Security.Strategy.SecuritySystemRole);
+            this.securityStrategyComplex1.RoleType = typeof(DevExpress.Persistent.BaseImpl.PermissionPolicy.PermissionPolicyRole);
             this.securityStrategyComplex1.UserType = typeof(MainDemo.Module.BusinessObjects.Employee);
+            this.securityStrategyComplex1.AssociationPermissionsMode = AssociationPermissionsMode.Manual;
             // 
             // authenticationStandard1
             // 

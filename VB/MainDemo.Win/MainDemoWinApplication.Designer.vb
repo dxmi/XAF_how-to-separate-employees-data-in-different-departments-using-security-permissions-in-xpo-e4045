@@ -41,12 +41,13 @@
 			' securityStrategyComplex1
 			' 
 			Me.securityStrategyComplex1.Authentication = Me.authenticationStandard1
-			Me.securityStrategyComplex1.RoleType = GetType(DevExpress.ExpressApp.Security.Strategy.SecuritySystemRole)
-			Me.securityStrategyComplex1.UserType = GetType(MainDemo.Module.BusinessObjects.Employee)
-			' 
-			' authenticationStandard1
-			' 
-			Me.authenticationStandard1.LogonParametersType = GetType(DevExpress.ExpressApp.Security.AuthenticationStandardLogonParameters)
+            Me.securityStrategyComplex1.RoleType = GetType(DevExpress.Persistent.BaseImpl.PermissionPolicy.PermissionPolicyRole)
+            Me.securityStrategyComplex1.UserType = GetType(MainDemo.Module.BusinessObjects.Employee)
+            Me.securityStrategyComplex1.AssociationPermissionsMode = DevExpress.ExpressApp.Security.AssociationPermissionsMode.Manual
+            ' 
+            ' authenticationStandard1
+            ' 
+            Me.authenticationStandard1.LogonParametersType = GetType(DevExpress.ExpressApp.Security.AuthenticationStandardLogonParameters)
 			' 
 			' MainDemoWinApplication
 			' 

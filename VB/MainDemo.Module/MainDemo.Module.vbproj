@@ -163,9 +163,6 @@
     <Content Include="Controllers\ReadMe.txt" />
     <Content Include="DatabaseUpdate\ReadMe.txt" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="E4045.cd" />
-  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.VisualBasic.targets" />
   <PropertyGroup>
   </PropertyGroup>

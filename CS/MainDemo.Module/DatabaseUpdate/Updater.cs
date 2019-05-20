@@ -4,10 +4,10 @@ using DevExpress.Data.Filtering;
 using MainDemo.Module.BusinessObjects;
 using DevExpress.ExpressApp.SystemModule;
 using DevExpress.Persistent.Base.General;
-using DevExpress.ExpressApp.Security.Strategy;
+using DevExpress.Persistent.BaseImpl.PermissionPolicy;
 
 namespace MainDemo.Module.DatabaseUpdate {
-	public class Updater : DevExpress.ExpressApp.Updating.ModuleUpdater {
+    public class Updater : DevExpress.ExpressApp.Updating.ModuleUpdater {
         public Updater(IObjectSpace objectSpace, Version currentDBVersion) : base(objectSpace, currentDBVersion) { }
         public override void UpdateDatabaseAfterUpdateSchema() {
             base.UpdateDatabaseAfterUpdateSchema();
@@ -58,6 +58,7 @@ namespace MainDemo.Module.DatabaseUpdate {
                 managerSam.SetPassword("");
                 managerSam.Department = devDepartment;
                 managerSam.Roles.Add(GetManagerRole());
+                managerSam.Roles.Add(GetUserRole());
                 managerSam.Save();
             }
             //John is an ordinary user within the Sam's department.
@@ -84,6 +85,7 @@ namespace MainDemo.Module.DatabaseUpdate {
                 managerMary.SetPassword("");
                 managerMary.Department = supDepartment;
                 managerMary.Roles.Add(GetManagerRole());
+                managerMary.Roles.Add(GetUserRole());
                 managerMary.Save();
             }
             //Joe is an ordinary user within the Mary's department.
@@ -140,10 +142,10 @@ namespace MainDemo.Module.DatabaseUpdate {
         }
 
         //Administrators can do everything within the application.
-        private SecuritySystemRole GetAdministratorRole() {
-            SecuritySystemRole administratorRole = ObjectSpace.FindObject<SecuritySystemRole>(new BinaryOperator("Name", "Administrators"));
+        private PermissionPolicyRole GetAdministratorRole() {
+            PermissionPolicyRole administratorRole = ObjectSpace.FindObject<PermissionPolicyRole>(new BinaryOperator("Name", "Administrators"));
             if(administratorRole == null) {
-                administratorRole = ObjectSpace.CreateObject<SecuritySystemRole>();
+                administratorRole = ObjectSpace.CreateObject<PermissionPolicyRole>();
                 administratorRole.Name = "Administrators";
                 //Can access everything.
                 administratorRole.IsAdministrative = true;
@@ -151,143 +153,134 @@ namespace MainDemo.Module.DatabaseUpdate {
             return administratorRole;
         }
         //Users can access and partially edit data (no create and delete capabilities) from their own department.
-        private SecuritySystemRole GetUserRole() {
-            SecuritySystemRole userRole = ObjectSpace.FindObject<SecuritySystemRole>(new BinaryOperator("Name", "Users"));
+        private PermissionPolicyRole GetUserRole() {
+            PermissionPolicyRole userRole = ObjectSpace.FindObject<PermissionPolicyRole>(new BinaryOperator("Name", "Users"));
             if(userRole == null) {
-                userRole = ObjectSpace.CreateObject<SecuritySystemRole>();
+                userRole = ObjectSpace.CreateObject<PermissionPolicyRole>();
                 userRole.Name = "Users";
 
-                SecuritySystemTypePermissionObject userTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject userTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 userTypePermission.TargetType = typeof(Employee);
                 userRole.TypePermissions.Add(userTypePermission);
 
-                SecuritySystemObjectPermissionsObject canViewEmployeesFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
+                PermissionPolicyObjectPermissionsObject canViewEmployeesFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
                 canViewEmployeesFromOwnDepartmentObjectPermission.Criteria = "Department.Employees[Oid = CurrentUserId()]";
-                //canViewEmployeesFromOwnDepartmentObjectPermission.Criteria = new BinaryOperator(new OperandProperty("Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-                canViewEmployeesFromOwnDepartmentObjectPermission.AllowNavigate = true;
-                canViewEmployeesFromOwnDepartmentObjectPermission.AllowRead = true;
+                //canViewEmployeesFromOwnDepartmentObjectPermission.Criteria = new ContainsOperator("Department.Employees", new BinaryOperator(new OperandProperty("Oid"), new FunctionOperator(CurrentUserIdOperator.OperatorName), BinaryOperatorType.Equal)).ToString();
+                canViewEmployeesFromOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canViewEmployeesFromOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 userTypePermission.ObjectPermissions.Add(canViewEmployeesFromOwnDepartmentObjectPermission);
-                
-                SecuritySystemMemberPermissionsObject canEditOwnUserMemberPermission = ObjectSpace.CreateObject<SecuritySystemMemberPermissionsObject>();
-				canEditOwnUserMemberPermission.Members = "ChangePasswordOnFirstLogon; StoredPassword; FirstName; LastName;";
-                canEditOwnUserMemberPermission.Criteria = "Oid=CurrentUserId()";
-                canEditOwnUserMemberPermission.Criteria = (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName)).ToString();
-                canEditOwnUserMemberPermission.AllowWrite = true;
+
+                PermissionPolicyMemberPermissionsObject canEditOwnUserMemberPermission = ObjectSpace.CreateObject<PermissionPolicyMemberPermissionsObject>();
+                canEditOwnUserMemberPermission.Members = "ChangePasswordOnFirstLogon; StoredPassword; FirstName; LastName;";
+                canEditOwnUserMemberPermission.Criteria = "Oid = CurrentUserId()";
+                //canEditOwnUserMemberPermission.Criteria = (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName)).ToString();
+                canEditOwnUserMemberPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 userTypePermission.MemberPermissions.Add(canEditOwnUserMemberPermission);
 
-				SecuritySystemMemberPermissionsObject canEditUserAssociationsFromOwnDepartmentMemberPermission = ObjectSpace.CreateObject<SecuritySystemMemberPermissionsObject>();
-				canEditUserAssociationsFromOwnDepartmentMemberPermission.Members = "Tasks; Department;";
+                PermissionPolicyMemberPermissionsObject canEditUserAssociationsFromOwnDepartmentMemberPermission = ObjectSpace.CreateObject<PermissionPolicyMemberPermissionsObject>();
+                canEditUserAssociationsFromOwnDepartmentMemberPermission.Members = "Tasks; Department;";
                 canEditUserAssociationsFromOwnDepartmentMemberPermission.Criteria = "Department.Employees[Oid = CurrentUserId()]";
-                //canEditUserAssociationsFromOwnDepartmentMemberPermission.Criteria = new BinaryOperator(new OperandProperty("Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-                canEditUserAssociationsFromOwnDepartmentMemberPermission.AllowWrite = true;
+                //canEditUserAssociationsFromOwnDepartmentMemberPermission.Criteria = new ContainsOperator("Department.Employees", new BinaryOperator(new OperandProperty("Oid"), new FunctionOperator(CurrentUserIdOperator.OperatorName), BinaryOperatorType.Equal)).ToString();
+                canEditUserAssociationsFromOwnDepartmentMemberPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 userTypePermission.MemberPermissions.Add(canEditUserAssociationsFromOwnDepartmentMemberPermission);
-				
 
-                SecuritySystemTypePermissionObject roleTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
-                roleTypePermission.TargetType = typeof(SecuritySystemRole);
-				roleTypePermission.AllowRead = true;
+
+                PermissionPolicyTypePermissionObject roleTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
+                roleTypePermission.TargetType = typeof(PermissionPolicyRole);
+                roleTypePermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 userRole.TypePermissions.Add(roleTypePermission);
 
 
-                SecuritySystemTypePermissionObject taskTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject taskTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 taskTypePermission.TargetType = typeof(EmployeeTask);
-                taskTypePermission.AllowNavigate = true;
+                taskTypePermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 userRole.TypePermissions.Add(taskTypePermission);
 
-				SecuritySystemMemberPermissionsObject canEditTaskAssociationsMemberPermission = ObjectSpace.CreateObject<SecuritySystemMemberPermissionsObject>();
-				canEditTaskAssociationsMemberPermission.Members = "AssignedTo;";
-				canEditTaskAssociationsMemberPermission.Criteria = "AssignedTo.Department.Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
+                PermissionPolicyMemberPermissionsObject canEditTaskAssociationsMemberPermission = ObjectSpace.CreateObject<PermissionPolicyMemberPermissionsObject>();
+                canEditTaskAssociationsMemberPermission.Members = "AssignedTo;";
                 canEditTaskAssociationsMemberPermission.Criteria = "AssignedTo.Department.Employees[Oid = CurrentUserId()]";
-                //canEditTaskAssociationsMemberPermission.Criteria = new BinaryOperator(new OperandProperty("AssignedTo.Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-				canEditTaskAssociationsMemberPermission.AllowWrite = true;
-				taskTypePermission.MemberPermissions.Add(canEditTaskAssociationsMemberPermission);
+                //canEditTaskAssociationsMemberPermission.Criteria = new ContainsOperator("AssignedTo.Department.Oid", new BinaryOperator(new OperandProperty("Oid"), new FunctionOperator(CurrentUserIdOperator.OperatorName), BinaryOperatorType.Equal)).ToString();
+                canEditTaskAssociationsMemberPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                taskTypePermission.MemberPermissions.Add(canEditTaskAssociationsMemberPermission);
 
-				SecuritySystemObjectPermissionsObject canyEditTasksFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
-				canyEditTasksFromOwnDepartmentObjectPermission.Criteria = "AssignedTo.Department.Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canyEditTasksFromOwnDepartmentObjectPermission.Criteria = "AssignedTo.Department.Employees[Oid = CurrentUserId()]";
-                //canyEditTasksFromOwnDepartmentObjectPermission.Criteria = new BinaryOperator(new OperandProperty("AssignedTo.Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-				canyEditTasksFromOwnDepartmentObjectPermission.AllowNavigate = true;
-				canyEditTasksFromOwnDepartmentObjectPermission.AllowWrite = true;
-				canyEditTasksFromOwnDepartmentObjectPermission.AllowRead = true;
-				taskTypePermission.ObjectPermissions.Add(canyEditTasksFromOwnDepartmentObjectPermission);
+                PermissionPolicyObjectPermissionsObject canEditTasksFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
+                canEditTasksFromOwnDepartmentObjectPermission.Criteria = "AssignedTo.Department.Employees[Oid = CurrentUserId()]";
+                //canyEditTasksFromOwnDepartmentObjectPermission.Criteria = new ContainsOperator("AssignedTo.Department.Oid", new BinaryOperator(new OperandProperty("Oid"), new FunctionOperator(CurrentUserIdOperator.OperatorName), BinaryOperatorType.Equal)).ToString();
+                canEditTasksFromOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditTasksFromOwnDepartmentObjectPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditTasksFromOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                taskTypePermission.ObjectPermissions.Add(canEditTasksFromOwnDepartmentObjectPermission);
 
-                SecuritySystemTypePermissionObject departmentTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject departmentTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 departmentTypePermission.TargetType = typeof(Department);
                 userRole.TypePermissions.Add(departmentTypePermission);
 
-				SecuritySystemObjectPermissionsObject canViewOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
-                canViewOwnDepartmentObjectPermission.Criteria = "Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canViewOwnDepartmentObjectPermission.Criteria = "Employees[Oid=CurrentUserId()]";
-                //canViewOwnDepartmentObjectPermission.Criteria = new BinaryOperator(new OperandProperty("Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-                canViewOwnDepartmentObjectPermission.AllowNavigate = true;
-                canViewOwnDepartmentObjectPermission.AllowRead = true;
+                PermissionPolicyObjectPermissionsObject canViewOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
+                canViewOwnDepartmentObjectPermission.Criteria = "Employees[Oid = CurrentUserId()]";
+                //canViewOwnDepartmentObjectPermission.Criteria = new ContainsOperator("Employees", (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName))).ToString();
+                canViewOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canViewOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 canViewOwnDepartmentObjectPermission.Save();
                 departmentTypePermission.ObjectPermissions.Add(canViewOwnDepartmentObjectPermission);
 
-				SecuritySystemMemberPermissionsObject canEditAssociationsMemberPermission = ObjectSpace.CreateObject<SecuritySystemMemberPermissionsObject>();
-				canEditAssociationsMemberPermission.Members = "Employees;";
-				canEditAssociationsMemberPermission.Criteria = "Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canEditAssociationsMemberPermission.Criteria = "Employees[Oid=CurrentUserId()]";
-                //canEditAssociationsMemberPermission.Criteria = new BinaryOperator(new OperandProperty("Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-				canEditAssociationsMemberPermission.AllowWrite = true;
-				departmentTypePermission.MemberPermissions.Add(canEditAssociationsMemberPermission);
+                PermissionPolicyMemberPermissionsObject canEditAssociationsMemberPermission = ObjectSpace.CreateObject<PermissionPolicyMemberPermissionsObject>();
+                canEditAssociationsMemberPermission.Members = "Employees;";
+                canEditAssociationsMemberPermission.Criteria = "Employees[Oid = CurrentUserId()]";
+                //canEditAssociationsMemberPermission.Criteria = new ContainsOperator("Employees", (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName))).ToString();
+                canEditAssociationsMemberPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                departmentTypePermission.MemberPermissions.Add(canEditAssociationsMemberPermission);
             }
             return userRole;
         }
         //Managers can access and fully edit (including create and delete capabilities) data from their own department. However, they cannot access data from other departments.
-        private SecuritySystemRole GetManagerRole() {
-            SecuritySystemRole managerRole = ObjectSpace.FindObject<SecuritySystemRole>(new BinaryOperator("Name", "Managers"));
+        private PermissionPolicyRole GetManagerRole() {
+            PermissionPolicyRole managerRole = ObjectSpace.FindObject<PermissionPolicyRole>(new BinaryOperator("Name", "Managers"));
             if(managerRole == null) {
-                managerRole = ObjectSpace.CreateObject<SecuritySystemRole>();
+                managerRole = ObjectSpace.CreateObject<PermissionPolicyRole>();
                 managerRole.Name = "Managers";
-                managerRole.ChildRoles.Add(GetUserRole());
 
-
-                SecuritySystemTypePermissionObject departmentTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject departmentTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 departmentTypePermission.TargetType = typeof(Department);
-                departmentTypePermission.AllowNavigate = true;
+                departmentTypePermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 managerRole.TypePermissions.Add(departmentTypePermission);
 
-				SecuritySystemObjectPermissionsObject canEditOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
-                canEditOwnDepartmentObjectPermission.Criteria = "Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canEditOwnDepartmentObjectPermission.Criteria = "Employees[Oid=CurrentUserId()]";
-                //canEditOwnDepartmentObjectPermission.Criteria = new BinaryOperator(new OperandProperty("Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal).ToString();
-                canEditOwnDepartmentObjectPermission.AllowNavigate = true;
-                canEditOwnDepartmentObjectPermission.AllowRead = true;
-                canEditOwnDepartmentObjectPermission.AllowWrite = true;
-                canEditOwnDepartmentObjectPermission.AllowDelete = true;
+                PermissionPolicyObjectPermissionsObject canEditOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
+                canEditOwnDepartmentObjectPermission.Criteria = "Employees[Oid = CurrentUserId()]";
+                //canEditOwnDepartmentObjectPermission.Criteria = new new ContainsOperator("Employees", (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName))).ToString();
+                canEditOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditOwnDepartmentObjectPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditOwnDepartmentObjectPermission.DeleteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 canEditOwnDepartmentObjectPermission.Save();
                 departmentTypePermission.ObjectPermissions.Add(canEditOwnDepartmentObjectPermission);
 
-                SecuritySystemTypePermissionObject employeeTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject employeeTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 employeeTypePermission.TargetType = typeof(Employee);
-                employeeTypePermission.AllowNavigate = true;
-                employeeTypePermission.AllowCreate = true;
+                employeeTypePermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                employeeTypePermission.CreateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 managerRole.TypePermissions.Add(employeeTypePermission);
-                SecuritySystemObjectPermissionsObject canEditEmployeesFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
-				canEditEmployeesFromOwnDepartmentObjectPermission.Criteria = "IsNull(Department) || Department.Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canEditEmployeesFromOwnDepartmentObjectPermission.Criteria = "IsNull(Department) || Department.Employees[Oid=CurrentUserId()]";
-                //canEditEmployeesFromOwnDepartmentObjectPermission.Criteria = (new NullOperator(new OperandProperty("Department")) | new BinaryOperator(new OperandProperty("Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal)).ToString();
-                canEditEmployeesFromOwnDepartmentObjectPermission.AllowWrite = true;
-                canEditEmployeesFromOwnDepartmentObjectPermission.AllowDelete = true;
-                canEditEmployeesFromOwnDepartmentObjectPermission.AllowNavigate = true;
-                canEditEmployeesFromOwnDepartmentObjectPermission.AllowRead = true;
+                PermissionPolicyObjectPermissionsObject canEditEmployeesFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
+                canEditEmployeesFromOwnDepartmentObjectPermission.Criteria = "IsNull(Department) || Department.Employees[Oid = CurrentUserId()]";
+                //canEditEmployeesFromOwnDepartmentObjectPermission.Criteria = (new NullOperator(new OperandProperty("Department")) | new ContainsOperator("Department.Employees", (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName)))).ToString();
+                canEditEmployeesFromOwnDepartmentObjectPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditEmployeesFromOwnDepartmentObjectPermission.DeleteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditEmployeesFromOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditEmployeesFromOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 canEditEmployeesFromOwnDepartmentObjectPermission.Save();
                 employeeTypePermission.ObjectPermissions.Add(canEditEmployeesFromOwnDepartmentObjectPermission);
 
-                SecuritySystemTypePermissionObject taskTypePermission = ObjectSpace.CreateObject<SecuritySystemTypePermissionObject>();
+                PermissionPolicyTypePermissionObject taskTypePermission = ObjectSpace.CreateObject<PermissionPolicyTypePermissionObject>();
                 taskTypePermission.TargetType = typeof(EmployeeTask);
-                taskTypePermission.AllowNavigate = true;
-                taskTypePermission.AllowCreate = true;
+                taskTypePermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                taskTypePermission.CreateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 managerRole.TypePermissions.Add(taskTypePermission);
-                SecuritySystemObjectPermissionsObject canEditTasksOnlyFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<SecuritySystemObjectPermissionsObject>();
-				canEditTasksOnlyFromOwnDepartmentObjectPermission.Criteria = "IsNull(AssignedTo) || IsNull(AssignedTo.Department) || AssignedTo.Department.Oid=[<Employee>][Oid=CurrentUserId()].Single(Department.Oid)";
-                canEditTasksOnlyFromOwnDepartmentObjectPermission.Criteria = "IsNull(AssignedTo) || IsNull(AssignedTo.Department) || AssignedTo.Department.Employees[Oid=CurrentUserId()]";
-                //canEditTasksOnlyFromOwnDepartmentObjectPermission.Criteria = (new NullOperator(new OperandProperty("AssignedTo")) | new NullOperator(new OperandProperty("AssignedTo.Department")) | new BinaryOperator(new OperandProperty("AssignedTo.Department.Oid"), currentlyLoggedEmployeeDepartmemntOid, BinaryOperatorType.Equal)).ToString();
-                canEditTasksOnlyFromOwnDepartmentObjectPermission.AllowNavigate = true;
-                canEditTasksOnlyFromOwnDepartmentObjectPermission.AllowRead = true;
-                canEditTasksOnlyFromOwnDepartmentObjectPermission.AllowWrite = true;
-                canEditTasksOnlyFromOwnDepartmentObjectPermission.AllowDelete = true;
+                PermissionPolicyObjectPermissionsObject canEditTasksOnlyFromOwnDepartmentObjectPermission = ObjectSpace.CreateObject<PermissionPolicyObjectPermissionsObject>();
+                canEditTasksOnlyFromOwnDepartmentObjectPermission.Criteria = "IsNull(AssignedTo) || IsNull(AssignedTo.Department) || AssignedTo.Department.Employees[Oid = CurrentUserId()]";
+                //canEditTasksOnlyFromOwnDepartmentObjectPermission.Criteria = (new NullOperator(new OperandProperty("AssignedTo")) | new NullOperator(new OperandProperty("AssignedTo.Department")) | new ContainsOperator("Department.Employees", (new OperandProperty("Oid") == new FunctionOperator(CurrentUserIdOperator.OperatorName)))).ToString();
+                canEditTasksOnlyFromOwnDepartmentObjectPermission.NavigateState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditTasksOnlyFromOwnDepartmentObjectPermission.ReadState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditTasksOnlyFromOwnDepartmentObjectPermission.WriteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
+                canEditTasksOnlyFromOwnDepartmentObjectPermission.DeleteState = DevExpress.Persistent.Base.SecurityPermissionState.Allow;
                 canEditTasksOnlyFromOwnDepartmentObjectPermission.Save();
                 taskTypePermission.ObjectPermissions.Add(canEditTasksOnlyFromOwnDepartmentObjectPermission);
             }
